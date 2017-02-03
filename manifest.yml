@@ -2,10 +2,11 @@ applications:
 - name: chaos-loris-broker
   memory: 512M
   instances: 2
-  buildpack: https://github.com/cloudfoundry/go-buildpack
-  command: chaos-loris-broker -c plans.yml
+  # buildpack: https://github.com/cloudfoundry/go-buildpack
+  buildpack: https://github.com/ryandotsmith/null-buildpack
+  path: .
+  command: ./cf-chaos-loris-broker -c plans.yml
   env:
     CHAOS_LORIS_HOST: https://chaos-loris.apps.wdc1.itcna.vmware.com
-    GOPACKAGENAME: main
   services:
   - chaos-loris-broker-db

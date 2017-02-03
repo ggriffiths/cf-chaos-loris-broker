@@ -13,7 +13,7 @@ import (
 )
 
 type serviceBroker struct {
-	Client client.Client
+	Client *client.Client
 	Config config.Config
 	Db     *gorm.DB
 	Opts   cmd.CommandOpts
@@ -21,7 +21,7 @@ type serviceBroker struct {
 }
 
 func NewServiceBroker(
-	client client.Client,
+	client *client.Client,
 	opts cmd.CommandOpts,
 	config config.Config,
 	db *gorm.DB,
@@ -66,6 +66,13 @@ func (b *serviceBroker) Provision(context context.Context, instanceId string, pr
 	if err != nil {
 		return brokerapi.ProvisionedServiceSpec{IsAsync: false}, err
 	}
+	b.Logger.Info("Starting provisioning a service instance", lager.Data{
+		"instance-id":       instanceId,
+		"plan-id":           plan.Name,
+		"plan-desctiption":  plan.Description,
+		"organization-guid": provisionDetails.OrganizationGUID,
+		"space-guid":        provisionDetails.SpaceGUID,
+	})
 
 	scheduleUrl, err := b.Client.CreateSchedule(instanceId, plan.Schedule)
 	if err != nil {
@@ -84,10 +91,8 @@ func (b *serviceBroker) Provision(context context.Context, instanceId string, pr
 	}
 
 	b.Logger.Info("service instance created", lager.Data{
-		"instance-id":       instanceId,
-		"plan-id":           provisionDetails.PlanID,
-		"organization-guid": provisionDetails.OrganizationGUID,
-		"space-guid":        provisionDetails.SpaceGUID,
+		"instance-id": instanceId,
+		"scheduleUrl": scheduleUrl,
 	})
 
 	return brokerapi.ProvisionedServiceSpec{IsAsync: false}, err

@@ -13,6 +13,7 @@ import (
 
 type Client struct {
 	Navigator halgo.Navigator
+	Logger    lager.Logger
 }
 
 type Application struct {
@@ -28,9 +29,9 @@ type Schedule struct {
 
 type Chaos struct {
 	halgo.Links
-	Application Application
-	Schedule    Schedule
-	Probobility float64
+	ApplicationUrl Application
+	ScheduleUrl    Schedule
+	Probobility    float64
 }
 
 type Event struct {
@@ -42,32 +43,35 @@ type Event struct {
 	Chaos                   Chaos
 }
 
-func New(host string) Client {
+func New(host string, logger lager.Logger) Client {
 	navigator := halgo.NewNavigator(host)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	navigator.HttpClient = &http.Client{Transport: tr}
-	client := Client{Navigator: navigator}
+	client := Client{Navigator: navigator, logger}
 	return client
 }
 
 func (c Client) CreateApp(applicationId string) (string, error) {
 	obj := Application{ApplicationId: applicationId}
-	spew.Dump(json.Marshal(obj))
+	c.Logger.Info("Creating an app: " + json.Marshal(obj))
 	return c.create("applications", obj)
 }
 
 func (c Client) CreateSchedule(name string, expression string) (string, error) {
 	obj := Schedule{Name: name, Expression: expression}
-	spew.Dump(json.Marshal(obj))
+	c.Logger.Info("Creating a schedule: " + json.Marshal(obj))
 	return c.create("schedules", obj)
 }
 
 func (c Client) CreateChaos(applicationLink string, scheduleLink string, probability float64) (string, error) {
-	obj := Chaos{}
-	spew.Dump(json.Marshal(obj))
-	// spew.Dump(scheduleLink, applicationLink, probability)
+	obj := Chaos{
+		ApplicationUrl: applicationLink,
+		ScheduleUrl:    scheduleLink,
+		Probobility:    probability,
+	}
+	c.Logger.Info("Creating a chaos: " + json.Marshal(obj))
 	return c.create("chaoses", obj)
 }
 

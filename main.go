@@ -55,7 +55,7 @@ func main() {
 	}
 	defer db.Close()
 
-	client := chaos_loris_cleint.New(opts.ChaosLorisHost)
+	client := &chaos_loris_cleint.New(opts.ChaosLorisHost, brokerLogger)
 
 	serviceBroker := broker.NewServiceBroker(
 		client,
@@ -66,8 +66,8 @@ func main() {
 	)
 
 	credentials := brokerapi.BrokerCredentials{
-		Username: opts.ChaosLorisUsername,
-		Password: opts.ChaosLorisPassword,
+		Username: opts.ServiceBrokerUsername,
+		Password: opts.ServiceBrokerPassword,
 	}
 
 	brokerAPI := brokerapi.New(serviceBroker, brokerLogger, credentials)

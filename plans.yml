@@ -3,12 +3,12 @@ plans:
 - name: green
   schedule: "0 0 * * * *"
   probobility: 0.1
-  description: ""
+  description: "Easy mode: runs destroy operation once per hour with probobility 0.1"
 - name: yellow
   schedule: "* */5 * * * *"
   probobility: 0.3
-  description: ""
+  description: "Normal mode: runs destroy operation each 5 mins with probobility 0.3"
 - name: red
   schedule: "*/10 * * * * *"
   probobility: 0.6
-  description: ""
+  description: "Nightmare: runs destroy operation each 10 secs with probobility 0.6"
