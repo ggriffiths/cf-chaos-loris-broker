@@ -3,8 +3,8 @@ package cmd
 type CommandOpts struct {
 	// -----> Global options
 	Version               func() error `long:"version" short:"v" description:"Show Service Brokere version"`
-	ChaosLorisHost        string       `long:"chaos-loris-host" short:"f" description:"Fetch variables"`
-	Port                  int          `long:"port" description:"Port of Service Broker" default:"8080" env:"PORT"`
+	ChaosLorisHost        string       `long:"chaos-loris-host" description:"Fetch variables" env:"CHAOS_LORIS_HOST"`
+	Port                  int          `long:"port" short:"p" description:"Port of Service Broker" default:"8080" env:"PORT"`
 	ConfigPath            string       `long:"config" short:"c" description:"Path to config with plans"`
 	ServiceID             string       `long:"service-broker-id" descrition:"service broker service id" default:"chaos-loris" env:"SERVICE_BROKER_ID"`
 	Name                  string       `long:"service-broker-name" descrition:"service broker name" default:"chaos-loris" env:"SERVICE_BROKER_NAME"`

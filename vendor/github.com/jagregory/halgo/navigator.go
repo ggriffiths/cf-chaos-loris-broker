@@ -3,6 +3,7 @@ package halgo
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -134,8 +135,12 @@ func (n Navigator) Location(resp *http.Response) (Navigator, error) {
 func (n Navigator) url() (string, error) {
 	url := n.rootUri
 
+	spew.Dump(url)
+	spew.Dump(n.path)
+
 	for _, link := range n.path {
 		links, err := n.getLinks(url)
+		spew.Dump(links)
 		if err != nil {
 			return "", fmt.Errorf("Error getting links (%s, %v): %v", url, links, err)
 		}
@@ -158,6 +163,8 @@ func (n Navigator) url() (string, error) {
 			return "", fmt.Errorf("Error making url absolute: %v", err)
 		}
 	}
+
+	spew.Dump(url)
 
 	return url, nil
 }

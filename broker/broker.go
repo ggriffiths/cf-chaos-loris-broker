@@ -8,6 +8,7 @@ import (
 	"github.com/Altoros/cf-chaos-loris-broker/cmd"
 	"github.com/Altoros/cf-chaos-loris-broker/config"
 	"github.com/Altoros/cf-chaos-loris-broker/model"
+	// "github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
 )
@@ -69,6 +70,7 @@ func (b *serviceBroker) Provision(context context.Context, instanceId string, pr
 	b.Logger.Info("Starting provisioning a service instance", lager.Data{
 		"instance-id":       instanceId,
 		"plan-id":           plan.Name,
+		"plan-probability":  plan.Probability,
 		"plan-desctiption":  plan.Description,
 		"organization-guid": provisionDetails.OrganizationGUID,
 		"space-guid":        provisionDetails.SpaceGUID,
@@ -118,16 +120,28 @@ func (b *serviceBroker) Deprovision(context context.Context, instanceId string, 
 
 func (b *serviceBroker) Bind(context context.Context, instanceId, bindingId string, details brokerapi.BindDetails) (brokerapi.Binding, error) {
 	var serivceInstance model.ServiceInstance
+	b.Logger.Info("Searching for a service instance", lager.Data{"instance_id": instanceId})
 	err := b.Db.First(&serivceInstance, "instance_id = ?", instanceId).Error
+
+	b.Logger.Info("Starting binding a service instance", lager.Data{
+		"instance-id":                 instanceId,
+		"serivceInstance.instanceId":  serivceInstance.InstanceId,
+		"serivceInstance.Probability": serivceInstance.Probability,
+		"app-guid":                    details.AppGUID,
+		"plan-id":                     details.PlanID,
+	})
+
 	if err != nil {
 		return brokerapi.Binding{}, err
 	}
+
 	appUrl, err := b.Client.CreateApp(details.AppGUID)
 	if err != nil {
 		return brokerapi.Binding{}, err
 	}
 
-	chaosUrl, err := b.Client.CreateChaos(appUrl, serivceInstance.ScheduleUrl, serivceInstance.Probability)
+	// 0.2
+	chaosUrl, err := b.Client.CreateChaos(appUrl, serivceInstance.ScheduleUrl, 0.3)
 	if err != nil {
 		return brokerapi.Binding{}, err
 	}

@@ -20,3 +20,14 @@ cf set-env chaos-loris JAVA_OPTS -Dlogging.level.org.springframework=TRACE
 cf restart chaos-loris
 ```
 
+ALTER TABLE application
+DROP UNIQUE application_id;
+
+
+```
+curl -k 'https://chaos-loris.appshaoses' -i -X POST -H 'Content-Type: application/json' -d '{
+  "schedule" : "https://chaos-loris.apps.wdc1.itcna.vmware.com/schedules/23",
+  "application" : "https://chaos-loris.apps.wdc1.itcna.vmware.com/applications/1",
+  "probability" : 0.1
+}'
+```

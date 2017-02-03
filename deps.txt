@@ -7,3 +7,4 @@ github.com/cloudfoundry-incubator/candiedyaml:99c3df8
 github.com/jinzhu/gorm:23abd03
 github.com/go-sql-driver/mysql:2e00b5c
 code.cloudfoundry.org/lager:6cfe365
+github.com/davecgh/go-spew/spew:346938d

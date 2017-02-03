@@ -55,10 +55,10 @@ func main() {
 	}
 	defer db.Close()
 
-	client := &chaos_loris_cleint.New(opts.ChaosLorisHost, brokerLogger)
+	client := chaos_loris_cleint.New(opts.ChaosLorisHost, brokerLogger)
 
 	serviceBroker := broker.NewServiceBroker(
-		client,
+		&client,
 		opts,
 		config,
 		db,

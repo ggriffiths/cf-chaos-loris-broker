@@ -1,6 +1,7 @@
 package client
 
 import (
+	"code.cloudfoundry.org/lager"
 	"crypto/tls"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jagregory/halgo"
@@ -12,8 +13,10 @@ import (
 )
 
 type Client struct {
-	Navigator halgo.Navigator
-	Logger    lager.Logger
+	Navigator  *halgo.Navigator
+	Host       string
+	HttpClient *http.Client
+	Logger     lager.Logger
 }
 
 type Application struct {
@@ -29,9 +32,9 @@ type Schedule struct {
 
 type Chaos struct {
 	halgo.Links
-	ApplicationUrl Application
-	ScheduleUrl    Schedule
-	Probobility    float64
+	ApplicationUrl string  `json:"application"`
+	ScheduleUrl    string  `json:"schedule"`
+	Probobility    float64 `json:"probability"`
 }
 
 type Event struct {
@@ -44,24 +47,37 @@ type Event struct {
 }
 
 func New(host string, logger lager.Logger) Client {
-	navigator := halgo.NewNavigator(host)
+	// navigator := halgo.NewNavigator(host)
+	// tr := &http.Transport{
+	// 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// }
+	// navigator.HttpClient = &http.Client{Transport: tr}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	navigator.HttpClient = &http.Client{Transport: tr}
-	client := Client{Navigator: navigator, logger}
+	httpClient := &http.Client{Transport: tr}
+
+	client := Client{Logger: logger, Host: host, HttpClient: httpClient}
 	return client
+}
+
+func (c Client) navigator() halgo.Navigator {
+	navigator := halgo.NewNavigator(c.Host)
+
+	navigator.HttpClient = c.HttpClient
+
+	return navigator
 }
 
 func (c Client) CreateApp(applicationId string) (string, error) {
 	obj := Application{ApplicationId: applicationId}
-	c.Logger.Info("Creating an app: " + json.Marshal(obj))
+	c.Logger.Info("Creating an app")
 	return c.create("applications", obj)
 }
 
 func (c Client) CreateSchedule(name string, expression string) (string, error) {
 	obj := Schedule{Name: name, Expression: expression}
-	c.Logger.Info("Creating a schedule: " + json.Marshal(obj))
+	c.Logger.Info("Creating a schedule")
 	return c.create("schedules", obj)
 }
 
@@ -71,16 +87,34 @@ func (c Client) CreateChaos(applicationLink string, scheduleLink string, probabi
 		ScheduleUrl:    scheduleLink,
 		Probobility:    probability,
 	}
-	c.Logger.Info("Creating a chaos: " + json.Marshal(obj))
-	return c.create("chaoses", obj)
+	jsonString, err := json.Marshal(obj)
+	c.Logger.Info("Creating a resource: " + string(jsonString))
+	if err != nil {
+		return "", err
+	}
+
+	spew.Dump(c.HttpClient)
+	response, err := c.HttpClient.Post(c.Host+"/chaoses", "application/json", bytes.NewReader(jsonString))
+	defer response.Body.Close()
+	if err != nil {
+		return "", err
+	}
+	resounceUrl, err := response.Location()
+	if err != nil {
+		return "", err
+	}
+
+	c.Logger.Info("Chaos is Created")
+	return resounceUrl.String(), err
 }
 
 func (c Client) create(resource string, obj interface{}) (string, error) {
 	jsonString, err := json.Marshal(obj)
+	c.Logger.Info("Creating a resource: " + string(jsonString))
 	if err != nil {
 		return "", err
 	}
-	response, err := c.Navigator.Follow(resource).Post("application/json", bytes.NewReader(jsonString))
+	response, err := c.navigator().Follow(resource).Post("application/json", bytes.NewReader(jsonString))
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +129,7 @@ func (c Client) create(resource string, obj interface{}) (string, error) {
 }
 
 func (c Client) Delete(url string) error {
-	response, err := c.Navigator.Follow(url).Delete()
+	response, err := c.navigator().Follow(url).Delete()
 	if err != nil {
 		return err
 	}
