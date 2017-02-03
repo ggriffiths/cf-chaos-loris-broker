@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"os"
 
-	// goflags "github.com/jessevdk/go-flags"
 	"github.com/Altoros/cf-chaos-loris-broker/broker"
+	"github.com/Altoros/cf-chaos-loris-broker/cmd"
 	"github.com/Altoros/cf-chaos-loris-broker/config"
+	"github.com/Altoros/cf-chaos-loris-broker/db"
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/pivotal-golang/lager"
 )
@@ -23,22 +24,24 @@ func main() {
 	brokerLogger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 	brokerLogger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.ERROR))
 
-	if brokerConfigPath == "" {
-		brokerLogger.Error("No config file specified", nil)
+	opts := cmd.CommandOpts{}
+	_, err := goflags.ParseArgs(&opts, os.Args[1:])
+
+	brokerLogger.Info("Using config file: " + opts.ConfigPath)
+
+	config, err := config.LoadFromFile(opts.ConfigPath)
+	if err != nil {
+		brokerLogger.Error("Failed to load the config file", err, lager.Data{
+			"broker-config-path": opts.ConfigPath,
+		})
 		return
 	}
 
-	brokerLogger.Info("Using config file: " + brokerConfigPath)
-
-	// conf, err := config.LoadFromFile(brokerConfigPath)
-	// if err != nil {
-	// 	brokerLogger.Error("Failed to load the config file", err, lager.Data{
-	// 		"broker-config-path": brokerConfigPath,
-	// 	})
-	// 	return
-	// }
-
-	config := config.Config{}
+	db, err = db.New()
+	if err != nil {
+		brokerLogger.Error("Failed to connect to the mysql: %s", err)
+	}
+	defer db.Close()
 
 	serviceBroker := broker.NewServiceBroker(
 		// instancecreators.NewDefault(config, brokerLogger),
@@ -56,9 +59,9 @@ func main() {
 	brokerAPI := brokerapi.New(serviceBroker, brokerLogger, credentials)
 	http.Handle("/", brokerAPI)
 	brokerLogger.Info("Listening for requests", lager.Data{
-		"port": config.ServiceBroker.Port,
+		"port": opts.Port,
 	})
-	err = http.ListenAndServe(fmt.Sprintf(":%d", config.ServiceBroker.Port), nil)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", opts.Port), nil)
 	if err != nil {
 		brokerLogger.Error("Failed to start the server", err)
 	}

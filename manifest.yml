@@ -1,0 +1,13 @@
+applications:
+- name: chaos-loris-broker
+  memory: 512M
+  instances: 2
+  buildpack: go_buildpack
+  command: chaos-loris-broker -c plans.yml
+  env:
+    # LORIS_CLOUDFOUNDRY_HOST: $CF_API_DOMAIN
+    # LORIS_CLOUDFOUNDRY_PASSWORD: $CF_ADMIN_PASSWORD
+    # LORIS_CLOUDFOUNDRY_SKIPSSLVALIDATION: true
+    # LORIS_CLOUDFOUNDRY_USERNAME: $CF_ADMIN_USERNAME
+  services:
+  - chaos-loris-broker-db
