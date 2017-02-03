@@ -15,6 +15,8 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/pivotal-cf/brokerapi"
+
+	"bytes"
 )
 
 func main() {
@@ -23,7 +25,18 @@ func main() {
 	brokerLogger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.ERROR))
 
 	opts := cmd.CommandOpts{}
-	_, err := goflags.ParseArgs(&opts, os.Args[1:])
+	parser := goflags.NewParser(&opts, goflags.HelpFlag|goflags.PassDoubleDash)
+	helpText := bytes.NewBufferString("")
+	parser.WriteHelp(helpText)
+
+	_, err := parser.ParseArgs(os.Args[1:])
+
+	// --help and --version result in errors; turn them into successful output cmds
+	if typedErr, ok := err.(*goflags.Error); ok {
+		if typedErr.Type == goflags.ErrHelp {
+			fmt.Printf(helpText.String())
+		}
+	}
 
 	brokerLogger.Info("Using config file: " + opts.ConfigPath)
 
