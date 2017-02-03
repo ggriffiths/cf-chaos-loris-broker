@@ -5,18 +5,16 @@ import (
 	"net/http"
 	"os"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/Altoros/cf-chaos-loris-broker/broker"
+	chaos_loris_cleint "github.com/Altoros/cf-chaos-loris-broker/client"
 	"github.com/Altoros/cf-chaos-loris-broker/cmd"
 	"github.com/Altoros/cf-chaos-loris-broker/config"
-	"github.com/Altoros/cf-chaos-loris-broker/db"
+	database "github.com/Altoros/cf-chaos-loris-broker/db"
+	goflags "github.com/jessevdk/go-flags"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/pivotal-golang/lager"
-)
-
-var (
-	localPersisterPath string
-	brokerStateRoot    string
-	brokerConfigPath   string
 )
 
 func main() {
@@ -37,30 +35,35 @@ func main() {
 		return
 	}
 
-	db, err = db.New()
+	var db *gorm.DB
+	db, err = database.New()
 	if err != nil {
 		brokerLogger.Error("Failed to connect to the mysql: %s", err)
 	}
 	defer db.Close()
 
+	client := chaos_loris_cleint.New(opts.ChaosLorisHost)
+
 	serviceBroker := broker.NewServiceBroker(
-		// instancecreators.NewDefault(config, brokerLogger),
-		// instancebinders.NewDefault(config, brokerLogger),
-		// persisters.NewLocalPersister(localPersisterPath),
+		client,
+		opts,
 		config,
+		db,
 		brokerLogger,
 	)
 
 	credentials := brokerapi.BrokerCredentials{
-		Username: config.ServiceBroker.Auth.Username,
-		Password: config.ServiceBroker.Auth.Password,
+		Username: opts.ChaosLorisUsername,
+		Password: opts.ChaosLorisPassword,
 	}
 
 	brokerAPI := brokerapi.New(serviceBroker, brokerLogger, credentials)
+
 	http.Handle("/", brokerAPI)
 	brokerLogger.Info("Listening for requests", lager.Data{
 		"port": opts.Port,
 	})
+
 	err = http.ListenAndServe(fmt.Sprintf(":%d", opts.Port), nil)
 	if err != nil {
 		brokerLogger.Error("Failed to start the server", err)

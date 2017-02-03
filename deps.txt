@@ -1,3 +1,9 @@
 github.com/jessevdk/go-flags:4e64e4a
 github.com/pivotal-cf/brokerapi:2888133
-github.com/pivotal-golang/lager:6cfe365
+github.com/jagregory/halgo:d1d6fd6
+github.com/18F/cf-service-connect/models:049db55
+code.cloudfoundry.org/cli/plugin:8806d2c
+github.com/cloudfoundry-incubator/candiedyaml:99c3df8
+github.com/jinzhu/gorm:23abd03
+github.com/go-sql-driver/mysql:2e00b5c
+code.cloudfoundry.org/lager:6cfe365

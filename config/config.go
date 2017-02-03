@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"github.com/cloudfoundry-incubator/candiedyaml"
 	"os"
 )
@@ -41,4 +42,13 @@ func LoadFromFile(path string) (Config, error) {
 	}
 	// TODO: add validations here
 	return config, nil
+}
+
+func (c Config) PlanByName(name string) (Plan, error) {
+	for _, plan := range c.Plans {
+		if plan.Name == name {
+			return plan, nil
+		}
+	}
+	return Plan{}, errors.New("Can't find plan")
 }

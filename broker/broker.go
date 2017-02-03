@@ -1,92 +1,171 @@
 package broker
 
 import (
+	"code.cloudfoundry.org/lager"
+	"context"
+	"errors"
+	"github.com/Altoros/cf-chaos-loris-broker/client"
+	"github.com/Altoros/cf-chaos-loris-broker/cmd"
 	"github.com/Altoros/cf-chaos-loris-broker/config"
+	"github.com/Altoros/cf-chaos-loris-broker/model"
+	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/pivotal-golang/lager"
 )
 
-type ServiceInstanceCreator interface {
-	Create(instanceID string, settings map[string]interface{}) error
-	Update(instanceID string, params map[string]interface{}) error
-	Destroy(instanceID string) error
-	InstanceExists(instanceID string) (bool, error)
-}
-
-type ServiceInstanceBinder interface {
-	Bind(instanceID string, bindingID string) (interface{}, error)
-	Unbind(instanceID string, bindingID string) error
-	InstanceExists(instanceID string) (bool, error)
-}
-
 type serviceBroker struct {
-	InstanceCreator ServiceInstanceCreator
-	InstanceBinder  ServiceInstanceBinder
-	// StatePersister  persisters.StatePersister
+	Client client.Client
 	Config config.Config
+	Db     *gorm.DB
+	Opts   cmd.CommandOpts
 	Logger lager.Logger
 }
 
 func NewServiceBroker(
-	// instanceCreator ServiceInstanceCreator,
-	// instanceBinder ServiceInstanceBinder,
-	// state,
-	conf config.Config,
+	client client.Client,
+	opts cmd.CommandOpts,
+	config config.Config,
+	db *gorm.DB,
 	logger lager.Logger) *serviceBroker {
 
 	return &serviceBroker{
-		// InstanceCreator: instanceCreator,
-		// InstanceBinder:  instanceBinder,
-		// StatePersister:  statePersister,
-		Config: conf,
+		Client: client,
+		Config: config,
+		Opts:   opts,
+		Db:     db,
 		Logger: logger,
 	}
 }
 
-func (b *serviceBroker) Services() []brokerapi.Service {
+func (b *serviceBroker) Services(context context.Context) []brokerapi.Service {
 	planList := []brokerapi.ServicePlan{}
+
+	for _, plan := range b.Config.Plans {
+		planList = append(planList, brokerapi.ServicePlan{
+			ID:          plan.Name,
+			Name:        plan.Name,
+			Description: plan.Description,
+		})
+	}
 	b.Logger.Info("Serving a catalog request")
 	return []brokerapi.Service{
 		{
-			ID:            b.Config.ServiceBroker.ServiceID,
-			Name:          b.Config.ServiceBroker.Name,
-			Description:   b.Config.ServiceBroker.Description,
+			ID:            b.Opts.ServiceID,
+			Name:          b.Opts.Name,
+			Description:   b.Opts.Description,
 			Bindable:      true,
-			Tags:          []string{"broker"},
+			Tags:          []string{"chaos-loris", "test"},
 			Plans:         planList,
 			PlanUpdatable: true,
 		},
 	}
 }
 
-func (b *serviceBroker) Provision(instanceID string, provisionDetails brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, error) {
-	settings := map[string]interface{}{}
-	return brokerapi.ProvisionedServiceSpec{IsAsync: false}, b.InstanceCreator.Create(instanceID, settings)
-}
+func (b *serviceBroker) Provision(context context.Context, instanceId string, provisionDetails brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, error) {
+	planName := provisionDetails.PlanID
+	plan, err := b.Config.PlanByName(planName)
+	if err != nil {
+		return brokerapi.ProvisionedServiceSpec{IsAsync: false}, err
+	}
 
-func (b *serviceBroker) Update(instanceID string, updateDetails brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.UpdateServiceSpec, error) {
-	params := map[string]interface{}{}
-	return brokerapi.UpdateServiceSpec{IsAsync: false}, b.InstanceCreator.Update(instanceID, params)
-}
+	scheduleUrl, err := b.Client.CreateSchedule(instanceId, plan.Schedule)
+	if err != nil {
+		return brokerapi.ProvisionedServiceSpec{IsAsync: false}, err
+	}
 
-func (b *serviceBroker) Deprovision(instanceID string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.DeprovisionServiceSpec, error) {
-	return brokerapi.DeprovisionServiceSpec{IsAsync: false}, b.InstanceCreator.Destroy(instanceID)
-}
+	serivceInstance := model.ServiceInstance{
+		InstanceId:  instanceId,
+		ScheduleUrl: scheduleUrl,
+		Probability: plan.Probability,
+	}
 
-func (b *serviceBroker) Bind(instanceID, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, error) {
-	b.Logger.Info("Looking for the service credentials", lager.Data{
-		"instance-id": instanceID,
-		"binding-id":  bindingID,
-		"details":     details,
+	err = b.Db.Create(&serivceInstance).Error
+	if err != nil {
+		return brokerapi.ProvisionedServiceSpec{IsAsync: false}, err
+	}
+
+	b.Logger.Info("service instance created", lager.Data{
+		"instance-id":       instanceId,
+		"plan-id":           provisionDetails.PlanID,
+		"organization-guid": provisionDetails.OrganizationGUID,
+		"space-guid":        provisionDetails.SpaceGUID,
 	})
-	creds, err := b.InstanceBinder.Bind(instanceID, bindingID)
-	return brokerapi.Binding{Credentials: creds}, err
+
+	return brokerapi.ProvisionedServiceSpec{IsAsync: false}, err
 }
 
-func (b *serviceBroker) Unbind(instanceID, bindingID string, details brokerapi.UnbindDetails) error {
-	return nil
+func (b *serviceBroker) Update(context context.Context, instanceId string, updateDetails brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.UpdateServiceSpec, error) {
+	return brokerapi.UpdateServiceSpec{IsAsync: false}, errors.New("Not implemented")
 }
 
-func (b *serviceBroker) LastOperation(instanceID string) (brokerapi.LastOperation, error) {
+func (b *serviceBroker) Deprovision(context context.Context, instanceId string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.DeprovisionServiceSpec, error) {
+	var serivceInstance model.ServiceInstance
+	err := b.Db.First(&serivceInstance, "instance_id = ?", instanceId).Error
+	err = b.Client.Delete(serivceInstance.ScheduleUrl)
+	if err != nil {
+		return brokerapi.DeprovisionServiceSpec{IsAsync: false}, err
+	}
+	err = b.Db.Delete(&serivceInstance).Error
+	b.Logger.Info("service instance is removed", lager.Data{
+		"instance-id": instanceId,
+	})
+	return brokerapi.DeprovisionServiceSpec{IsAsync: false}, err
+}
+
+func (b *serviceBroker) Bind(context context.Context, instanceId, bindingId string, details brokerapi.BindDetails) (brokerapi.Binding, error) {
+	var serivceInstance model.ServiceInstance
+	err := b.Db.First(&serivceInstance, "instance_id = ?", instanceId).Error
+	if err != nil {
+		return brokerapi.Binding{}, err
+	}
+	appUrl, err := b.Client.CreateApp(details.AppGUID)
+	if err != nil {
+		return brokerapi.Binding{}, err
+	}
+
+	chaosUrl, err := b.Client.CreateChaos(appUrl, serivceInstance.ScheduleUrl, serivceInstance.Probability)
+	if err != nil {
+		return brokerapi.Binding{}, err
+	}
+
+	serviceBinding := model.ServiceBinding{
+		BindingId:      bindingId,
+		ChaosUrl:       chaosUrl,
+		ApplicationUrl: appUrl,
+		InstanceId:     instanceId,
+	}
+	err = b.Db.Create(&serviceBinding).Error
+	if err != nil {
+		return brokerapi.Binding{}, err
+	}
+	b.Logger.Info("service binding created", lager.Data{
+		"instance-id": instanceId,
+		"binding-id":  bindingId,
+	})
+	return brokerapi.Binding{}, err
+}
+
+func (b *serviceBroker) Unbind(context context.Context, instanceId, bindingId string, details brokerapi.UnbindDetails) error {
+	var serivceBinding model.ServiceBinding
+	err := b.Db.First(&serivceBinding, "binding_id = ?", bindingId).Error
+	if err != nil {
+		return err
+	}
+
+	err = b.Client.Delete(serivceBinding.ChaosUrl)
+	if err != nil {
+		return err
+	}
+
+	err = b.Client.Delete(serivceBinding.ApplicationUrl)
+	if err != nil {
+		return err
+	}
+
+	err = b.Db.Delete(&serivceBinding).Error
+
+	return err
+}
+
+func (b *serviceBroker) LastOperation(context context.Context, instanceID, operationData string) (brokerapi.LastOperation, error) {
 	return brokerapi.LastOperation{}, nil
 }
