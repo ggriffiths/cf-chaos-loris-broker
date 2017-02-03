@@ -129,12 +129,13 @@ func (c Client) create(resource string, obj interface{}) (string, error) {
 }
 
 func (c Client) Delete(url string) error {
-	response, err := c.navigator().Follow(url).Delete()
-	if err != nil {
-		return err
-	}
-	if response.StatusCode >= 400 {
-		return errors.New("Server error")
-	}
-	return err
+	// response, err := c.navigator().Follow(url).Delete()
+	// if err != nil {
+	// 	return err
+	// }
+	// if response.StatusCode >= 400 {
+	// 	return errors.New("Server error")
+	// }
+	// return err
+	return nil
 }

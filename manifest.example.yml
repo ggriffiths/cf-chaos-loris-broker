@@ -7,6 +7,6 @@ applications:
   path: .
   command: ./cf-chaos-loris-broker -c plans.yml
   env:
-    CHAOS_LORIS_HOST: https://chaos-loris.apps.wdc1.itcna.vmware.com
+    CHAOS_LORIS_HOST: https://chaos-loris.<apps-domain>
   services:
   - chaos-loris-broker-db
