@@ -8,3 +8,6 @@ github.com/jinzhu/gorm:23abd03
 github.com/go-sql-driver/mysql:2e00b5c
 code.cloudfoundry.org/lager:6cfe365
 github.com/davecgh/go-spew/spew:346938d
+github.com/jtacoma/uritemplates:307ae86
+github.com/jinzhu/inflection:1c35d90
+github.com/gorilla/mux:392c28f
